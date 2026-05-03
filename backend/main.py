@@ -6,12 +6,15 @@ from fastapi.middleware.cors import CORSMiddleware
 from typing import Optional
 import uvicorn
 
-from ocr import extract_text_from_image, extract_text_from_pdf
+from ocr import extract_text_from_image_via_vision, extract_text_from_pdf
 from ai_processor import simplify_text
 
-app = FastAPI(title="StudyBuddy API")
+app = FastAPI(
+    title="Explaniarmus API",
+    description="Powered by Groq + LLaMA",
+    version="1.0.0"
+)
 
-# Allow Flutter app to talk to this server
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,9 +22,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
 @app.get("/")
 def root():
-    return {"status": "StudyBuddy backend is running ✅"}
+    return {"status": "Explaniarmus backend is running ✅"}
 
 
 @app.post("/simplify-text")
@@ -39,15 +43,17 @@ async def simplify_image(
     file: UploadFile = File(...),
     bangla: Optional[bool] = Form(False)
 ):
-    """Accept an uploaded image, run OCR, then simplify."""
+    """Accept an uploaded image, use Groq vision to read it, then simplify."""
     contents = await file.read()
-    extracted_text = extract_text_from_image(contents)
+
+    content_type = file.content_type or "image/jpeg"
+    extracted_text = extract_text_from_image_via_vision(contents, content_type)
 
     if not extracted_text.strip():
         return {"error": "Could not extract text from image."}
 
     result = await simplify_text(extracted_text, include_bangla=bangla)
-    result["extracted_text"] = extracted_text  # send back what was extracted
+    result["extracted_text"] = extracted_text
     return result
 
 

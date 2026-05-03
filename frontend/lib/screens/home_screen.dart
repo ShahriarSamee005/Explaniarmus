@@ -28,7 +28,7 @@ class HomeScreen extends StatelessWidget {
 
               // Title
               const Text(
-                'StudyBuddy',
+                'Explaniarmus',
                 style: TextStyle(
                   fontSize: 32,
                   fontWeight: FontWeight.bold,

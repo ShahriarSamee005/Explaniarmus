@@ -96,7 +96,7 @@ Future<void> _pickPdf() async {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('StudyBuddy'),
+        title: const Text('Explaniarmus'),
         backgroundColor: Colors.deepPurple,
         foregroundColor: Colors.white,
       ),
