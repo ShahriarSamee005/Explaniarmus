@@ -1,57 +1,78 @@
-import easyocr
 import fitz  # PyMuPDF
-import numpy as np
-from PIL import Image
-import io
+import base64
+from groq import Groq
+import os
+from dotenv import load_dotenv
 
-# Initialize EasyOCR reader once (downloads model on first run)
-# We support English + Bengali
-reader = easyocr.Reader(['en', 'bn'], gpu=False)
+load_dotenv()
+
+groq_client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 
-def extract_text_from_image(image_bytes: bytes) -> str:
+def extract_text_from_image_via_vision(image_bytes: bytes, content_type: str = "image/jpeg") -> str:
     """
-    Takes raw image bytes (jpg, png, etc.)
-    Returns extracted text as a single string.
+    Send image directly to LLaMA vision — reads and extracts text.
+    No local OCR needed. Fast and accurate.
     """
-    # Convert bytes to numpy array for EasyOCR
-    image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    image_np = np.array(image)
+    base64_image = base64.b64encode(image_bytes).decode('utf-8')
 
-    results = reader.readtext(image_np, detail=0, paragraph=True)
-    return "\n".join(results)
+    response = groq_client.chat.completions.create(
+        model="meta-llama/llama-4-scout-17b-16e-instruct",
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:{content_type};base64,{base64_image}"
+                        }
+                    },
+                    {
+                        "type": "text",
+                        "text": "Extract ALL text from this image exactly as written. Return only the extracted text, nothing else. No explanations."
+                    }
+                ]
+            }
+        ],
+        max_tokens=2000,
+    )
+
+    return response.choices[0].message.content.strip()
 
 
-def extract_text_from_pdf(pdf_bytes: bytes) -> str:
+def extract_text_from_pdf(pdf_bytes: bytes, max_pages: int = 10) -> str:
     """
-    Takes raw PDF bytes.
-    First tries direct text extraction (fast).
-    If empty, converts pages to images and runs OCR (for scanned PDFs).
-    Returns all extracted text as a single string.
+    Extract text from PDF.
+    - First tries direct text extraction (fast, works for normal PDFs)
+    - Limits to first 5 pages to avoid timeout
+    - For scanned pages, uses Groq vision instead of local OCR
     """
     text_parts = []
 
-    # Open PDF from bytes
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+    total_pages = len(doc)
 
-    for page_num in range(len(doc)):
+    pages_to_process = min(total_pages, max_pages)
+
+    for page_num in range(pages_to_process):
         page = doc[page_num]
-
-        # Try direct text extraction first
         page_text = page.get_text().strip()
 
         if page_text:
-            text_parts.append(page_text)
+            text_parts.append(f"[Page {page_num + 1}]\n{page_text}")
         else:
-            # Scanned PDF — render page as image and OCR it
-            pix = page.get_pixmap(dpi=200)
-            img_bytes = pix.tobytes("png")
-
-            image = Image.open(io.BytesIO(img_bytes)).convert("RGB")
-            image_np = np.array(image)
-
-            results = reader.readtext(image_np, detail=0, paragraph=True)
-            text_parts.append("\n".join(results))
+            # Scanned page — use Groq vision
+            pix = page.get_pixmap(dpi=150)
+            img_bytes = pix.tobytes("jpeg")
+            extracted = extract_text_from_image_via_vision(img_bytes, "image/jpeg")
+            text_parts.append(f"[Page {page_num + 1}]\n{extracted}")
 
     doc.close()
+
+    if total_pages > max_pages:
+        text_parts.append(
+            f"\n[Note: Document has {total_pages} pages. Only first {max_pages} processed.]"
+        )
+
     return "\n\n".join(text_parts)
