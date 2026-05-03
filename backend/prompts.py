@@ -1,9 +1,4 @@
 def build_simplify_prompt(text: str, include_bangla: bool = False) -> str:
-    """
-    Builds the prompt sent to the AI.
-    """
-
-    # Build the optional bangla field BEFORE the f-string
     if include_bangla:
         bangla_field = ',\n  "bangla_translation": "..."'
         bangla_instruction = '6. "bangla_translation": A Bangla translation of the simple_explanation field only.'
@@ -13,7 +8,6 @@ def build_simplify_prompt(text: str, include_bangla: bool = False) -> str:
 
     prompt = f"""
 You are an academic assistant helping a university student understand their assignment or academic text.
-
 Read the following academic text carefully and respond ONLY with a valid JSON object — no extra text, no markdown, no explanation outside the JSON.
 
 Academic Text:

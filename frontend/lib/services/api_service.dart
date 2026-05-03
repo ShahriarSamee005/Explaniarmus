@@ -44,7 +44,6 @@ class ApiService {
         simpleExplanation: '',
         summaryPoints: [],
         tasks: [],
-        error: 'Server error: ${response.statusCode}',
       );
     }
 
@@ -75,7 +74,6 @@ class ApiService {
         simpleExplanation: '',
         summaryPoints: [],
         tasks: [],
-        error: 'Server error: ${response.statusCode}',
       );
     }
 
